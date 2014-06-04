@@ -1,0 +1,104 @@
+<!doctype>
+<head>
+	<link type="text/css" rel="stylesheet" href="http://code.shutterstock.com/rickshaw/src/css/graph.css">
+	<link type="text/css" rel="stylesheet" href="http://code.shutterstock.com/rickshaw/src/css/detail.css">
+	<link type="text/css" rel="stylesheet" href="http://code.shutterstock.com/rickshaw/src/css/legend.css">
+	<link type="text/css" rel="stylesheet" href="http://code.shutterstock.com/rickshaw/examples/css/lines.css">
+
+
+
+</head>
+<body>
+
+<div id="chart_container">
+	<div id="chart"></div>
+	<div id="legend_container">
+		<div id="smoother" title="Smoothing"></div>
+		<div id="legend"></div>
+	</div>
+	<div id="slider"></div>
+</div>
+
+<h1>jQuery Example</h1>
+<p><input type=text size=20 name=api placeholder="API">
+<p><input type=text size=20 name=query placeholder="Query">
+<p><input type=text size=20 name=product placeholder="Product">
+<p><input type=text size=20 name=version placeholder="Version">
+<p><a href=# id=calculate>calculate server side</a>
+
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+<script src="http://code.shutterstock.com/rickshaw/vendor/d3.v3.js"></script>
+<script src="http://code.shutterstock.com/rickshaw/rickshaw.js"></script>
+<script type=text/javascript>
+function graph_data(series_data, request_params, id) {
+	// get data
+
+{#	var series_data = {{data|tojson|safe}};
+	var request_params = {{request_params|tojson|safe}};
+#}
+	// instantiate our graph!
+
+	var graph = new Rickshaw.Graph( {
+		element: document.getElementById(id),
+		width: 960,
+		height: 500,
+		renderer: 'line',
+		series: [
+			{
+				color: "#c05020",
+				data: series_data,
+				name: request_params['product']+" "+request_params['version']
+			}
+		]
+	} );
+
+	graph.render();
+
+	var hoverDetail = new Rickshaw.Graph.HoverDetail( {
+		graph: graph
+	} );
+
+	var legend = new Rickshaw.Graph.Legend( {
+		graph: graph,
+		element: document.getElementById('legend')
+
+	} );
+
+	var shelving = new Rickshaw.Graph.Behavior.Series.Toggle( {
+		graph: graph,
+		legend: legend
+	} );
+
+	var axes = new Rickshaw.Graph.Axis.Time( {
+		graph: graph
+	} );
+	axes.render();
+}
+
+$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+$(function() {
+$('a#calculate').bind('click', function() {
+  $.post($SCRIPT_ROOT + '/_get_data', {
+    api: $('input[name="api"]').val(),
+    query: $('input[name="query"]').val(),
+    product: $('input[name="product"]').val(),
+    version: $('input[name="version"]').val()
+  }, function(data) {
+    // $("#result").text(data.result);
+    var series_data = data.series_data;
+    var request_params = data.request_params;
+    var id = "chart";
+    graph_data(series_data,request_params,id);
+  });
+  return false;
+});
+});
+
+
+
+
+
+</script>
+
+</body>
