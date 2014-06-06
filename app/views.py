@@ -5,6 +5,7 @@ import datetime
 import requests
 import concurrent.futures 
 import numpy as nm
+from flask_cors import cross_origin
 
 def unixTime(dtime):
 	return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
@@ -16,6 +17,7 @@ def add_numbers():
     return jsonify(result=a + b)
 
 @app.route('/_get_data', methods=['POST'])
+@cross_origin()
 def get_graph():
 	if request.form['api'] == 'crash-stats':
 		request_params = {
@@ -90,5 +92,6 @@ def get_graph():
 
 @app.route('/')
 @app.route('/index')
+@cross_origin()
 def index():
 	return render_template('ts.html')
