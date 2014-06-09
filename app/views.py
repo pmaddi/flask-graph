@@ -22,13 +22,23 @@ def get_graph():
 	if request.form['api'] == 'crash-stats':
 		request_params = {
 				'end_date':'2014-07-01',
-				'product':request.form['product'],
+				'product':'Firefox',
 				'start_date':'2000-01-01',
-				'version':request.form['version']
+				'version':'32.0a1',
+				'query':'CrashTrends'
 			}
-		r = requests.get('https://crash-stats.mozilla.com/api/'+request.form['query']+'/',
-			params = request_params)
+		print request_params['query']
 
+		for key in request.form.keys():
+			print key
+			print len(request.form[key])
+			if len(request.form[key]) > 1:
+				request_params.update({key : request.form[key]})
+		
+		print request_params['query']
+		r = requests.get('https://crash-stats.mozilla.com/api/'+request_params['query']+'/',
+			params = request_params)
+		print r
 		# Create an object to pass that indexes by report_date
 		# each report_date key has a data and value object 
 		# data is the bulid_date and number of crashes
@@ -56,17 +66,27 @@ def get_graph():
 
 	elif request.form['api'] == 'talos':
 		request_params = {
-			'product':'potato',
-			'version':'2345'
+			'days_ago':1,
+			'product':'Firefox',
+			'os_name':'linux',
+			'os_version':'Ubuntu 12.04',
+			'branch_version':'32.0a1',
+			'processor':'x86',
+			'build_type':'opt',
+			'test_name':'ts_paint',
+			'title':'talos',
+			'version':' '
 		}
-		r = requests.get('https://datazilla.mozilla.org/refdata/pushlog/list/?days_ago=1&branches=Mozilla-Inbound')
+		request_params.update(request.form)
+		request
+		r = requests.get('https://datazilla.mozilla.org/refdata/pushlog/list/?days_ago='+str(request_params['days_ago'])+'&branches=Mozilla-Inbound')
 		out = []
 		for elm in r.json():
 			out.extend(r.json()[elm]['revisions'])
 		# print out
 
 		def printRequest(elm):
-			r = requests.get('https://datazilla.mozilla.org/talos/testdata/raw/Mozilla-Inbound/'+elm+'?product=Firefox&os_name=linux&os_version=Ubuntu%2012.04&branch_version=32.0a1&processor=x86&build_type=opt&test_name=ts_paint')
+			r = requests.get('https://datazilla.mozilla.org/talos/testdata/raw/Mozilla-Inbound/'+elm, params = request_params)
 			return r.json()
 
 		res = []
