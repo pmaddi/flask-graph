@@ -10,12 +10,6 @@ from flask_cors import cross_origin
 def unixTime(dtime):
 	return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
 
-@app.route('/_add_numbers')
-def add_numbers():
-    a = request.args.get('a', 0, type=int)
-    b = request.args.get('b', 0, type=int)
-    return jsonify(result=a + b)
-
 @app.route('/_get_data', methods=['POST'])
 @cross_origin()
 def get_graph():
