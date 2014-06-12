@@ -70,7 +70,7 @@ def get_graph():
 			'product':'Firefox',
 			'os_name':'linux',
 			'os_version':'Ubuntu 12.04',
-			'branch_version':'32.0a1',
+			'branch_version':'33.0a1',
 			'processor':'x86',
 			'build_type':'opt',
 			'test_name':'ts_paint',
