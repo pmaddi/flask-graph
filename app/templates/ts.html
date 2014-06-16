@@ -81,7 +81,7 @@ $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
 $(function() {
 $('a#calculate').bind('click', function() {
   $.post($SCRIPT_ROOT + '/_get_data', {
-    api: $('input[name="api"]').val(),
+    source: $('input[name="api"]').val(),
     query: $('input[name="query"]').val(),
     product: $('input[name="product"]').val(),
     version: $('input[name="version"]').val()

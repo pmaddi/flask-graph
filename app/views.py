@@ -13,7 +13,8 @@ def unixTime(dtime):
 @app.route('/_get_data', methods=['POST'])
 @cross_origin()
 def get_graph():
-	if request.form['api'] == 'crash-stats':
+	print request.form
+	if request.form['source'] == 'crash-stats':
 		request_params = {
 				'end_date':'2014-07-01',
 				'product':'Firefox',
@@ -58,7 +59,7 @@ def get_graph():
 
 		return jsonify(series_data = data, request_params = request_params)
 
-	elif request.form['api'] == 'talos':
+	elif request.form['source'] == 'talos':
 		request_params = {
 			'days_ago':1,
 			'product':'Firefox',
