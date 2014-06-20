@@ -5,6 +5,7 @@ import datetime
 import requests
 import concurrent.futures 
 import numpy as nm
+import json
 from flask_cors import cross_origin
 
 def unixTime(dtime):
@@ -22,7 +23,8 @@ def get_graph():
 				'version':'32.0a1',
 				'query':'CrashTrends'
 			}
-		print request_params['query']
+		form_data = json.loads(request.form['data'])
+		request_params.update(form_data)
 
 		for key in request.form.keys():
 			print key
@@ -72,8 +74,8 @@ def get_graph():
 			'title':'talos',
 			'version':' '
 		}
-		request_params.update(request.form)
-		request
+		form_data = json.loads(request.form['data'])
+		request_params.update(form_data)
 		r = requests.get('https://datazilla.mozilla.org/refdata/pushlog/list/?days_ago='+str(request_params['days_ago'])+'&branches=Mozilla-Inbound')
 		out = []
 		for elm in r.json():
@@ -97,7 +99,7 @@ def get_graph():
 		            print('%r generated an exception: %s' % (url, exc))
 		        else:
 		            if data:
-		                data = {'x':data[0]['testrun']['date'], 'y':nm.mean(data[0]['results']['ts_paint'])}
+		                data = {'x':data[0]['testrun']['date'], 'y':nm.mean(data[0]['results'][request_params['test_name']])}
 		                # print data
 		                res.append(data)
 		data = res
