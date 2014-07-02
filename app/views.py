@@ -9,12 +9,14 @@ import json
 from flask_cors import cross_origin
 
 def unixTime(dtime):
+	"""Convert a given year-month-date string into a unix time""" 
 	return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
 
 @app.route('/_get_data', methods=['POST'])
 @cross_origin()
+# The endpoint where the data from each source can be accessed
 def get_graph():
-	print request.form
+	# print request.form
 	if request.form['source'] == 'crash-stats':
 		request_params = {
 				'end_date':'2014-07-01',
