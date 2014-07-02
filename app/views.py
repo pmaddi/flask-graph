@@ -19,12 +19,12 @@ def get_graph():
 	# print request.form
 	if request.form['source'] == 'crash-stats':
 		request_params = {
-				'end_date':'2014-07-01',
-				'product':'Firefox',
-				'start_date':'2000-01-01',
-				'version':'32.0a1',
-				'query':'CrashTrends'
-			}
+			'end_date':'2014-07-01',
+			'product':'Firefox',
+			'start_date':'2000-01-01',
+			'version':'32.0a1',
+			'query':'CrashTrends'
+		}
 		form_data = json.loads(request.form['data'])
 		request_params.update(form_data)
 
@@ -106,6 +106,7 @@ def get_graph():
 		                res.append(data)
 		data = res
 		data.sort(key=lambda v: v['x'])
+		print data
 		return jsonify(series_data = data, request_params = request_params)
 
 
@@ -113,4 +114,4 @@ def get_graph():
 @app.route('/index')
 @cross_origin()
 def index():
-	return render_template('ts.html')
+	return render_template('index.html')
