@@ -8,6 +8,8 @@ import numpy as nm
 import json
 from flask_cors import cross_origin
 
+CrashdataURL = "https://crash-analysis.mozilla.com/rkaiser/Firefox-daily.json"
+
 def unixTime(dtime):
 	"""Convert a given year-month-date string into a unix time""" 
 	return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
@@ -18,47 +20,41 @@ def unixTime(dtime):
 def get_graph():
 	# print request.form
 	if request.form['source'] == 'crash-stats':
+
+		crashdata = requests.get(CrashdataURL).json()
 		request_params = {
-			'end_date':'2014-07-01',
+			'end_date':'2020-07-01',
 			'product':'Firefox',
 			'start_date':'2000-01-01',
 			'version':'32.0a1',
+			'perADI':'1',
 			'query':'CrashTrends'
 		}
+
 		form_data = json.loads(request.form['data'])
 		request_params.update(form_data)
 
-		for key in request.form.keys():
-			print key
-			print len(request.form[key])
-			if len(request.form[key]) > 1:
-				request_params.update({key : request.form[key]})
-		
-		print request_params['query']
-		r = requests.get('https://crash-stats.mozilla.com/api/'+request_params['query']+'/',
-			params = request_params)
-		print r
-		# Create an object to pass that indexes by report_date
-		# each report_date key has a data and value object 
-		# data is the bulid_date and number of crashes
-		# value is the total number of crashes over all builds
-		crashes = {}
-		for crash in r.json()['crashtrends']:
-			if unixTime(crash['report_date']) in crashes.keys():
-				crashes[unixTime(crash['report_date'])]['data']\
-				.update({unixTime(crash['build_date']): int(crash['report_count'])})
-				crashes[unixTime(crash['report_date'])]['value'] = \
-				crashes[unixTime(crash['report_date'])]['value'] + int(crash['report_count'])
-			else:
-				crashes[unixTime(crash['report_date'])] = \
-				{'data': {unixTime(crash['build_date']): int(crash['report_count'])}
-				, 'value':int(crash['report_count'])}
-		
-		# convert to proper rickshaw format
-		# [{x:x,y:y,y0:0},...]
+		crashdata_version = crashdata[request_params['version']]
+
+		print request_params
 		data = []
-		for key in crashes.keys():
-			data.append({'x':key,'y':crashes[key]['value']})
+		if request_params['perADI'] == '1':
+			for day in crashdata_version.keys():
+				if (unixTime(day) < unixTime(request_params['end_date'])) \
+				and (unixTime(day) > unixTime(request_params['start_date'])):
+					data.append({ \
+						'x':unixTime(day), \
+						'y':float(crashdata_version[day]['crashes'])/float(crashdata_version[day]['adu'])
+					})
+		else:
+			for day in crashdata_version.keys():
+				if (unixTime(day) < unixTime(request_params['end_date'])) \
+				and (unixTime(day) > unixTime(request_params['start_date'])):
+					data.append({ \
+						'x':unixTime(day), \
+						'y':crashdata_version[day]['crashes']
+					})
+
 		data.sort(key=lambda v: v['x'])
 
 		return jsonify(series_data = data, request_params = request_params)

@@ -48,6 +48,7 @@
 	    var series_data = data.series_data;
 	    var request_params = data.request_params;
 	    var id = "chart";
+	    document.getElementById(id).innerHTML = "";
 	    graph_data(series_data,request_params,id);
 	  });
 	  return false;
