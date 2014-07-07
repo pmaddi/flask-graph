@@ -127,6 +127,5 @@ def get_graph():
 
 @app.route('/')
 @app.route('/index')
-@cross_origin()
 def index():
 	return render_template('index.html')
