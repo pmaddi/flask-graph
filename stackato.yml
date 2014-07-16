@@ -4,3 +4,5 @@ framework:
   runtime: python27
 processes:
   web: python web.py
+cron:
+  - "* * * * * ls > $HOME/env"
