@@ -18,6 +18,19 @@ def unixTime(dtime):
 	"""Convert a given year-month-date string into a unix time""" 
 	return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
 
+def ymdTime(utime):
+	"""Convert a given a unix time into a year-month-date string""" 
+	return datetime.date.fromtimestamp(utime/1000).isoformat()
+
+def addDicts (x, y):
+	return { k: x.get(k, 0) + y.get(k, 0) for k in set(x) | set(y) }
+
+def mergeDicts (x, y):
+	return { k: addDicts(x.get(k, {}), y.get(k, {})) for k in set(x) | set(y) }
+
+def sumDicts (dictList):
+	return reduce (mergeDicts, dictList, {})
+
 @app.route('/_get_data', methods=['POST'])
 @cross_origin()
 # The endpoint where the data from each source can be accessed
@@ -27,13 +40,16 @@ def get_graph():
 		# Pull in the data from the crash-stats pages
 		crashdata = requests.get(CrashdataURL).json()
 
+
+
 		# Define default params for the API
 		request_params = {
 			'end_date':'2020-07-01',
 			'product':'Firefox',
 			'start_date':'2000-01-01',
-			'version':'32.0a1',
-			'perADI':'1',
+			'version':'32',
+			'adu':'1',
+			'crashes':'1',			
 			'query':'CrashTrends'
 		}
 
@@ -41,12 +57,22 @@ def get_graph():
 		form_data = json.loads(request.form['data'])
 		request_params.update(form_data)
 
+		# Convert the soft tags into the correct format
+		if len(str(request_params['end_date'])) > 10:
+			request_params['end_date'] = ymdTime( int (request_params['end_date']) );
+
+		if len(str(request_params['start_date'])) > 10:
+			request_params['start_date'] = ymdTime( int (request_params['start_date']) );	
+
 		# Select the version from the data
-		crashdata_version = crashdata[request_params['version']]
 		data = []
 
+		# Get all valid versions
+		request_crashdata = sorted([ crashdata[k] for k in crashdata.keys() if k[0:2] == str(request_params['version'])])
+		crashdata_version = sumDicts (request_crashdata)
+
 		# Specify format based on "perADI"
-		if request_params['perADI'] == '1':
+		if request_params['adu'] == '1' and request_params['crashes'] == '1':
 			for day in crashdata_version.keys():
 				# Only use if falls in daterange
 				if (unixTime(day) < unixTime(request_params['end_date'])) \
@@ -56,7 +82,16 @@ def get_graph():
 						# Divide by ADI when specified.
 						'y':float(crashdata_version[day]['crashes'])/float(crashdata_version[day]['adu'])
 					})
-		else:
+		elif request_params['adu'] == '1' and request_params['crashes'] == '0':
+			for day in crashdata_version.keys():
+				# Only use if falls in daterange
+				if (unixTime(day) < unixTime(request_params['end_date'])) \
+				and (unixTime(day) > unixTime(request_params['start_date'])):
+					data.append({ \
+						'x':unixTime(day), \
+						'y':crashdata_version[day]['adu']
+					})
+		else: # request_params['adu'] == '0' and request_params['crashes'] == '1':
 			for day in crashdata_version.keys():
 				# Only use if falls in daterange
 				if (unixTime(day) < unixTime(request_params['end_date'])) \

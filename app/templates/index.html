@@ -11,10 +11,7 @@
 {# Form for the explorer #}
 <h1>Dash API Explorer</h1>
 <p><input type=text size=20 name=api placeholder="API">
-<p><input type=text size=20 name=query placeholder="Query">
-<p><input type=text size=20 name=product placeholder="Product">
-<p><input type=text size=20 name=version placeholder="Version">
-<p><input type=text size=20 name=data placeholder="Data">
+<p><textarea type=text size=20 name=data placeholder="Data"></textarea>
 <p><a href=# id=calculate>Send Request</a>
 
 {# Placeholder for the API explorer where plots are placed #}
@@ -40,9 +37,7 @@
 	$('a#calculate').bind('click', function() {
 	  $.post($SCRIPT_ROOT + '/_get_data', {
 	    source: $('input[name="api"]').val(),
-	    query: $('input[name="query"]').val(),
-	    product: $('input[name="product"]').val(),
-	    data: $('input[name="data"]').val(),
+	    data: $('textarea[name="data"]').val(),
 	  }, function(data) {
 	    // $("#result").text(data.result);
 	    var series_data = data.series_data;
