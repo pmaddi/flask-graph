@@ -7,6 +7,9 @@ import concurrent.futures
 import numpy as nm
 import json
 from flask_cors import cross_origin
+from urlparse import urljoin
+from bs4 import BeautifulSoup
+import re
 
 # The URL :kaiRo maintains that stores ADI and crashes per version
 CrashdataURL = "https://crash-analysis.mozilla.com/rkaiser/Firefox-daily.json"
@@ -16,11 +19,26 @@ TalosURL = 'https://datazilla.mozilla.org/refdata/pushlog/list/'
 
 def unixTime(dtime):
 	"""Convert a given year-month-date string into a unix time""" 
-	return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
+	if dtime:
+		return time.mktime(datetime.datetime.strptime(str(dtime), "%Y-%m-%d").timetuple())
+	else:
+		return 0
 
 def ymdTime(utime):
 	"""Convert a given a unix time into a year-month-date string""" 
 	return datetime.date.fromtimestamp(utime/1000).isoformat()
+
+def daysList(day1, day2):
+    # Both days are ymd strings
+    day1 = datetime.datetime.strptime(str(day1), "%Y-%m-%d")
+    day2 = datetime.datetime.strptime(str(day2), "%Y-%m-%d")
+	
+    days = []
+
+    while day1 < day2:
+        days.append( day1.isoformat()[0:10] )
+        day1 += datetime.timedelta(days=1)
+    return days
 
 def addDicts (x, y):
 	return { k: x.get(k, 0) + y.get(k, 0) for k in set(x) | set(y) }
@@ -31,16 +49,36 @@ def mergeDicts (x, y):
 def sumDicts (dictList):
 	return reduce (mergeDicts, dictList, {})
 
+def addDictsTotal (x, y):
+	return {'total':int(x.get('total', 0)) + int(y.get('total', 0))}
+
+def mergeDictsTotal (x, y):
+	return { k: addDictsTotal(x.get(k, {}), y.get(k, {})) for k in set(x) | set(y) }
+
+def sumDictsTotal (dictList):
+	return reduce (mergeDictsTotal, dictList, {})	
+
+def startupCrashes(version):
+	u1 = "https://crash-analysis.mozilla.com/rkaiser/"
+	r = requests.get("https://crash-analysis.mozilla.com/rkaiser/").text
+	s = BeautifulSoup (r)
+
+	hrefs = s.find_all(href=True)
+	sums = sumDictsTotal ( [ \
+		requests.get(urljoin(u1,f['href'])).json() \
+		for f \
+		in hrefs \
+		if re.search('ff-.*'+str(version)+'.*startup.*json', str(f))] )
+	return { k: sums[k]['total'] for k in sums.keys() }
+
+
+
+
 @app.route('/_get_data', methods=['POST'])
 @cross_origin()
 # The endpoint where the data from each source can be accessed
 def get_graph():
 	if request.form['source'] == 'crash-stats':
-
-		# Pull in the data from the crash-stats pages
-		crashdata = requests.get(CrashdataURL).json()
-
-
 
 		# Define default params for the API
 		request_params = {
@@ -50,7 +88,7 @@ def get_graph():
 			'version':'32',
 			'adu':'1',
 			'crashes':'1',			
-			'query':'CrashTrends'
+			'query':'crashesperadu' # crashesperadu, crashes, adu, startupcrashes
 		}
 
 		# Update defaults with user specified data
@@ -67,39 +105,78 @@ def get_graph():
 		# Select the version from the data
 		data = []
 
+		days = daysList(request_params['start_date'], request_params['end_date'])
+
+
+		# Pull in the data from the crash-stats pages
+		crashdata = requests.get(CrashdataURL).json()
+
 		# Get all valid versions
 		request_crashdata = sorted([ crashdata[k] for k in crashdata.keys() if k[0:2] == str(request_params['version'])])
 		crashdata_version = sumDicts (request_crashdata)
 
-		# Specify format based on "perADI"
-		if request_params['adu'] == '1' and request_params['crashes'] == '1':
-			for day in crashdata_version.keys():
-				# Only use if falls in daterange
-				if (unixTime(day) < unixTime(request_params['end_date'])) \
-				and (unixTime(day) > unixTime(request_params['start_date'])):
+
+		if request_params['query'] == 'startupcrashes':
+			crashdata_version = startupCrashes (request_params['version'])
+			# Only use if falls in daterange
+			for day in days:
+				# If we have data for it
+				if (day in crashdata_version.keys()):
+					data.append({ \
+						'x':unixTime(day), \
+						'y':float(crashdata_version[day])
+					})
+				else:
+					data.append({ \
+						'x':unixTime(day), \
+						'y':0
+					})
+		elif request_params['query'] == 'crashesperadu':
+			for day in days:
+				# If we have data for it
+				if (day in crashdata_version.keys()):
 					data.append({ \
 						'x':unixTime(day), \
 						# Divide by ADI when specified.
 						'y':float(crashdata_version[day]['crashes'])/float(crashdata_version[day]['adu'])
 					})
-		elif request_params['adu'] == '1' and request_params['crashes'] == '0':
-			for day in crashdata_version.keys():
-				# Only use if falls in daterange
-				if (unixTime(day) < unixTime(request_params['end_date'])) \
-				and (unixTime(day) > unixTime(request_params['start_date'])):
+				else:
+					data.append({ \
+						'x':unixTime(day), \
+						'y':0
+					})
+		elif request_params['query'] == 'adu':
+			for day in days:
+				# If we have data for it
+				if (day in crashdata_version.keys()):
 					data.append({ \
 						'x':unixTime(day), \
 						'y':crashdata_version[day]['adu']
 					})
-		else: # request_params['adu'] == '0' and request_params['crashes'] == '1':
-			for day in crashdata_version.keys():
-				# Only use if falls in daterange
-				if (unixTime(day) < unixTime(request_params['end_date'])) \
-				and (unixTime(day) > unixTime(request_params['start_date'])):
+				else:
+					data.append({ \
+						'x':unixTime(day), \
+						'y':0
+					})
+		elif request_params['query'] == 'crashes':
+			for day in days:
+				# If we have data for it
+				if (day in crashdata_version.keys()):
 					data.append({ \
 						'x':unixTime(day), \
 						'y':crashdata_version[day]['crashes']
 					})
+				else:
+					data.append({ \
+						'x':unixTime(day), \
+						'y':0
+					})
+		else:
+			for day in days:
+				data.append({ \
+					'x':unixTime(day), \
+					'y':0
+				})
 
 		# Organize data for the frontend
 		data.sort(key=lambda v: v['x'])
@@ -107,7 +184,6 @@ def get_graph():
 		return jsonify(series_data = data, request_params = request_params)
 
 	elif request.form['source'] == 'talos':
-
 		# Define default params for the API
 		request_params = {
 			'days_ago':1,
