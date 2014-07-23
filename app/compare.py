@@ -7,13 +7,13 @@ import datetime, time
 from optparse import OptionParser
 import sys
 import os
+import json
 
-SERVER = 'graphs.mozilla.org'
-selector = '/api/test/runs'
-
-debug = 1
 
 def getGraphData(testid, branchid, platformid):
+    SERVER = 'graphs.mozilla.org'
+    selector = '/api/test/runs'
+    debug = 1
     body = {"id": testid, "branchid": branchid, "platformid": platformid}
     if debug >= 3:
         print "Querying graph server for: %s" % body
@@ -33,7 +33,7 @@ def getGraphData(testid, branchid, platformid):
 
     if data['stat'] == 'fail':
         return None
-    return data
+    return { i[2]:i[3] for i in data['test_runs'] }
 
 if __name__ == '__main__':
     print getGraphData(83,1,33)
