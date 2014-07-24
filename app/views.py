@@ -11,6 +11,14 @@ from urlparse import urljoin
 from bs4 import BeautifulSoup
 import re
 
+import urllib
+import httplib
+# import datetime, time
+from optparse import OptionParser
+# import sys
+# import os
+# import json
+
 # The URL :kaiRo maintains that stores ADI and crashes per version
 CrashdataURL = "https://crash-analysis.mozilla.com/rkaiser/Firefox-daily.json"
 
@@ -29,16 +37,16 @@ def ymdTime(utime):
 	return datetime.date.fromtimestamp(utime/1000).isoformat()
 
 def daysList(day1, day2):
-    # Both days are ymd strings
-    day1 = datetime.datetime.strptime(str(day1), "%Y-%m-%d")
-    day2 = datetime.datetime.strptime(str(day2), "%Y-%m-%d")
+	# Both days are ymd strings
+	day1 = datetime.datetime.strptime(str(day1), "%Y-%m-%d")
+	day2 = datetime.datetime.strptime(str(day2), "%Y-%m-%d")
 	
-    days = []
+	days = []
 
-    while day1 < day2:
-        days.append( day1.isoformat()[0:10] )
-        day1 += datetime.timedelta(days=1)
-    return days
+	while day1 < day2:
+		days.append( day1.isoformat()[0:10] )
+		day1 += datetime.timedelta(days=1)
+	return days
 
 def addDicts (x, y):
 	return { k: x.get(k, 0) + y.get(k, 0) for k in set(x) | set(y) }
@@ -72,12 +80,78 @@ def startupCrashes(version):
 	return { k: sums[k]['total'] for k in sums.keys() }
 
 
+def getGraphData(testid, branchid, platformid):
+	SERVER = 'graphs.mozilla.org'
+	selector = '/api/test/runs'
+	debug = 1
+	body = {"id": testid, "branchid": branchid, "platformid": platformid}
+	if debug >= 3:
+		print "Querying graph server for: %s" % body
+	params = urllib.urlencode(body)
+	headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
+	conn = httplib.HTTPConnection(SERVER)
+	conn.request("POST", selector, params, headers)
+	response = conn.getresponse()
+	data = response.read()
+
+	if data:
+		try:
+			data = json.loads(data)
+		except:
+			print "NOT JSON: %s" % data
+			return None
+
+	if data['stat'] == 'fail':
+		return None
+	return { i[2] : i[3] for i in data['test_runs'] }
+
 
 
 @app.route('/_get_data', methods=['POST'])
 @cross_origin()
 # The endpoint where the data from each source can be accessed
 def get_graph():
+
+	if request.form['source'] == 'graphs':
+		# Define default params for the API
+		request_params = {
+			'end_date':'2020-07-01',
+			'start_date':'2000-01-01',
+			'branch':83,
+			'test':1,
+			'platform':33,
+		}
+
+		# Update defaults with user specified data
+		form_data = json.loads(request.form['data'])
+		request_params.update(form_data)
+
+		# Convert the soft tags into the correct format
+		if len(str(request_params['end_date'])) > 10:
+			request_params['end_date'] = ymdTime( int (request_params['end_date']) );
+
+		if len(str(request_params['start_date'])) > 10:
+			request_params['start_date'] = ymdTime( int (request_params['start_date']) );	
+
+		# Select the version from the data
+		data = []
+		days = daysList(request_params['start_date'], request_params['end_date'])
+
+		graphdata = getGraphData (request_params['branch'], request_params['test'], request_params['platform'])
+		# Only use if falls in daterange
+		for day in graphdata.keys():
+			if (unixTime(request_params['start_date']) <=  int(day) and unixTime(request_params['end_date']) >=  int(day) ):
+				data.append({ \
+					'x':int(day), \
+					'y':float(graphdata[day])
+				})
+
+		# TODO try this out!!!
+		data.sort(key=lambda v: v['x'])
+
+		return jsonify(series_data = data, request_params = request_params)
+
+
 	if request.form['source'] == 'crash-stats':
 
 		# Define default params for the API
@@ -86,8 +160,6 @@ def get_graph():
 			'product':'Firefox',
 			'start_date':'2000-01-01',
 			'version':'32',
-			'adu':'1',
-			'crashes':'1',			
 			'query':'crashesperadu' # crashesperadu, crashes, adu, startupcrashes
 		}
 
@@ -217,18 +289,18 @@ def get_graph():
 		# Use ThreadPool since its faster for network operations
 		# We can use a with statement to ensure threads are cleaned up promptly
 		with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-		    # Start the load operations and mark each future with its URL
-		    future_to_url = {executor.submit(fetchData, url): url for url in refrences}
-		    for future in concurrent.futures.as_completed(future_to_url):
-		        url = future_to_url[future]
-		        try:
-		            data = future.result()
-		        except Exception as exc:
-		            print('%r generated an exception: %s' % (url, exc))
-		        else:
-		            if data:
-		                data = {'x':data[0]['testrun']['date'], 'y':nm.mean(data[0]['results'][request_params['test_name']])}
-		                res.append(data)
+			# Start the load operations and mark each future with its URL
+			future_to_url = {executor.submit(fetchData, url): url for url in refrences}
+			for future in concurrent.futures.as_completed(future_to_url):
+				url = future_to_url[future]
+				try:
+					data = future.result()
+				except Exception as exc:
+					print('%r generated an exception: %s' % (url, exc))
+				else:
+					if data:
+						data = {'x':data[0]['testrun']['date'], 'y':nm.mean(data[0]['results'][request_params['test_name']])}
+						res.append(data)
 		data = res
 
 		# Organize data for frontend
